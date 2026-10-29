@@ -16,7 +16,8 @@ C'est un projet au long cours (plusieurs mois, voire années). Chaque étape est
 ## Organisation
 | Dossier | Contenu |
 |---|---|
-| `documentation/recherches/` | Notes de recherche : critiques, sources, analyses |
+| `documentation/fiches/` | Fiches d'étude du Volume 1 (Parties 1 et 2), exemples d'assembleur et encodages binaires (`01` à `10`) |
+| `documentation/recherches/` | Notes de recherche : critiques, vérifications et synthèse des choix pour IA-86 |
 | `documentation/intel/` | Manuel officiel Intel, **non versionné** (voir ci-dessous) |
 
 ## Manuel de référence
@@ -34,8 +35,10 @@ Ces documents appartiennent à Intel et ne sont pas redistribués ici. Ils se t�
 ## Avancement
 - [x] Manuel récupéré
 - [x] Première recherche sur les critiques d'IA-64
-- [ ] Fiches d'étude du volume 1
-- [ ] Analyse des points critiques, verdict par point
+- [x] Fiches d'étude du volume 1 et programmes d'assembleur encodés à la main (`documentation/fiches/01` à `10`)
+- [x] Analyse des points critiques, verdict par point et cahier des charges d'IA-86 (`documentation/recherches/synthese-critique-et-choix-ia86.md`)
+- [ ] Simulateur d'un sous-ensemble d'IA-64
+- [ ] Spécification du nouveau jeu d'instructions (IA-86)
 
 ## Licence
 Code et documentation du projet : [Apache 2.0](LICENSE). Itanium et Intel sont des marques d'Intel Corporation ; ce projet n'est pas affilié à Intel.
