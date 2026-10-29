@@ -28,8 +28,8 @@ Tous les formats annoncés correspondent au manuel (vol. 3, chap. 2, ligne « Fo
 | movl | X2 | X2 | ✅ |
 | cmp, cmp4 | A6 / A7 / A8 | A6 / A7 / A8 | ✅ |
 | mov pr (from / to / rot) | I25 / I23 / I24 | I25 / I23 / I24 | ✅ |
-| ld (sans incrément / reg / imm9) | M2 / M2 / M3 | M2 / M2 / M3 sur la page de `ld` | ⚠️ voir ci-dessous |
-| st (normal / imm9) | M6 / M5 | M6 / M5 | ✅ |
+| ld (sans incrément / reg / imm9) | M2 / M2 / M3 | M1 (noté M2 par coquille hors Table 4-4) / M2 / M3 | ✅ voir ci-dessous |
+| st (normal / imm9) | M6 / M5 | M4 (noté M6 par coquille hors Table 4-4) / M5 | ✅ voir ci-dessous |
 | br (relatif / compté / indirect) | B1 / B2 / B4 | B1 / B2 / B4 | ✅ |
 | br.call (relatif / indirect) | B3 / B5 | B3 / B5 | ✅ |
 | alloc | M34 | M34 | ✅ |
@@ -39,7 +39,11 @@ Tous les formats annoncés correspondent au manuel (vol. 3, chap. 2, ligne « Fo
 | nop.i/b/m/f/x | I18, B9, M48, F16, X5 | idem | ✅ |
 | break.i/b/m/f/x | I19, B9, M37, F15, X1 | idem | ✅ |
 
-⚠️ **`ld r1 = [r3]` : M1 ou M2 ?** La page de `ld` et l'en-tête de la section 4.4.1.1 donnent « M2 » dans le texte extrait, mais le tableau récapitulatif des formats (chap. 4) appelle « Int Load » **M1**. Probablement un défaut d'extraction du texte. [À VÉRIFIER] en regardant la page 3:323 dans le PDF.
+✅ **Contrôle visuel (29/10/2026) — `ld r1 = [r3]` (`M1` vs `M2`) et `st [r3] = r2` (`M4` vs `M6`) :**
+C'est une **coquille d'édition du manuel Intel (rév. 2.3)** :
+- La table récapitulative **Table 4-4** (vol. 3, p. 3:296) numérote dans l'ordre logique : `M1` = *Int Load* (`r1 = [r3]`, bits 19:13 ignorés en blanc), `M2` = *Int Load +Reg* (`r1 = [r3], r2`), `M3` = *Int Load +Imm*, `M4` = *Int Store* (`[r3] = r2`, bits 12:6 ignorés en blanc), `M5` = *Int Store +Imm*, `M6` = *FP Load*, `M9` = *FP Store*, `M13` = *Line Prefetch*.
+- Mais aux pages `ld` (p. 3:151), `st` (p. 3:247), dans les tables d'opcodes 4-30/4-34 (p. 3:324, 3:326) et aux sections **4.4.1.1** (p. 3:329) et **4.4.1.4** (p. 3:332), le manuel imprime `M2` pour les deux chargements entiers (en distinguant quand même le schéma graphique : bits 19:13 blancs en 4.4.1.1, champ `r2` jaune en 4.4.1.2) et décale les stores entiers sur `M6`, les FP loads sur `M9`, les FP stores sur `M13` et `lfetch` sur `M18`.
+- L'encodage binaire, lui, est sans aucune ambiguïté : bit 36 `m = 0` sans post-incrément (bits 19:13 ignorés = 0), `m = 1` avec post-incrément par `r2`.
 
 ## 2. Encodage bit à bit (refait d'après le vol. 3, chap. 4)
 ✅ Bundle (Figure 3-15, p. 1:38) : template bits 4:0, slot 0 bits 45:5, slot 1 bits 86:46, slot 2 bits 127:87. Les formules de découpage de Gemini sont justes.
@@ -71,9 +75,15 @@ Opcodes de l'addition (Table 4-9, p. 3:300) : add = x2a 0, ve 0, x4 0, x2b 0 ; a
 
 ⚠️ **Calculé par un script à partir des tables du manuel, non testé** avec un vrai assembleur IA-64 (aucun n'est installé). À contrôler plus tard avec un désassembleur (binutils `objdump` compilé pour ia64, par exemple).
 
-## 3. Tableau des templates (Table 3-10, p. 1:38-1:39)
+## 3. Tableau des templates (Table 3-10, p. 1:38-1:39 et Table 4-2, p. 3:294)
 ✅ Unités par slot exactes pour les 32 valeurs. ✅ Réservés : 06, 07, 14, 15, 1A, 1B, 1E, 1F. ✅ MLX = 04/05 (anciennement MLI, note a).
-⚠️ La position des stops (doubles traits dans le tableau) ne s'extrait pas en texte. Le texte confirme seulement l'exemple « 00 sans stop, 03 avec un stop après le slot 1 et un autre après le slot 2 ». La règle « bit 0 = stop final » de Gemini est cohérente mais [À VÉRIFIER] visuellement dans le PDF.
+✅ **Contrôle visuel (29/10/2026) — Position exacte des stops (doubles traits) :**
+- La règle **« bit 0 = 1 ↔ stop après le slot 2 (fin du bundle) »** est **confirmée à 100 %** sur les 24 templates définis (tous les codes impairs ont un double trait à droite du slot 2, aucun code pair n'en a).
+- Seuls 4 templates ont un stop interne :
+  - `0x02` (`MI_I`) : stop après le slot 1.
+  - `0x03` (`MI_I_`) : stop après le slot 1 **et** après le slot 2.
+  - `0x0A` (`M_MI`) : stop après le slot 0.
+  - `0x0B` (`M_MI_`) : stop après le slot 0 **et** après le slot 2.
 
 ## 4. Les trois programmes
 
@@ -81,7 +91,7 @@ Opcodes de l'addition (Table 4-9, p. 3:300) : add = x2a 0, ve 0, x4 0, x2b 0 ; a
 |---|---|---|
 | 1. Somme de 1 à N | ✅ | Règles justes : `alloc` en tête de groupe, qualifiant p0 (p. 1:42) ; écriture de LC puis branchement dans le même groupe **interdite**, donc le stop est nécessaire (p. 1:42) ; écriture de PFS puis `br.ret` dans le même groupe **permise** (p. 1:42) ; `br.cloop` décrémente LC tant qu'il est non nul. |
 | 2. Si/sinon prédiqué | ❌ **Erreur** | Le bundle 2 n'a pas de `;;` alors que le bundle 3 lit `r12` et `r13` écrits dans le bundle 2 : c'est une dépendance RAW dans le même groupe, interdite (§ 3.4, p. 1:40-1:41). Gemini l'écrit lui-même dans son commentaire (« doit avoir un stop, donc 0x09 ») mais ne met pas le `;;` dans le code. Correction : `(p1) mov r16 = r12 ;;` à la fin du bundle 2. |
-| 3. Boucle pipelinée (br.ctop) | ✅ (logique) | `clrrrb` en dernière instruction du groupe (p. 3:37) ; `alloc` qui change `sor` exige des `rrb` à zéro, sinon faute Reserved Register/Field (vol. 3, page d'`alloc`) : d'où `clrrrb` avant ; `br.ctop` interdit dans le même groupe qu'`alloc` (p. 1:42) : respecté. ⚠️ « EC = nombre d'étages (3) » : non retrouvé mot pour mot, [À VÉRIFIER] p. 1:76-1:77. |
+| 3. Boucle pipelinée (br.ctop) | ✅ (logique) | `clrrrb` en dernière instruction du groupe (p. 3:37) ; `alloc` qui change `sor` exige des `rrb` à zéro, sinon faute Reserved Register/Field (vol. 3, page d'`alloc`) : d'où `clrrrb` avant ; `br.ctop` interdit dans le même groupe qu'`alloc` (p. 1:42) : respecté. ✅ **Contrôle visuel (29/10/2026) :** p. 1:77 (§ 4.5.1) confirme mot pour mot : *« LC is initialized to one less than the number of iterations for the counted loop and EC is initialized to the number of stages into which the loop body has been partitioned. »* |
 
 ## 5. Tableau « garder / simplifier / jeter »
 C'est l'avis de Gemini (marqué « hors manuel »), pas un fait. Les faits qu'il cite sont justes :
@@ -101,5 +111,5 @@ Nos propres verdicts se feront plus tard, dans la phase 2.
 - ✅ Une écriture de BR, PFS ou d'un prédicat (sauf depuis une instruction flottante) est vue par un branchement du même groupe ; c'est **interdit pour LC et EC** (p. 1:42). Gemini l'a bien dit.
 
 ## À faire ensuite
-- [ ] Regarder dans le PDF : p. 3:323 (M1 ou M2), Table 3-10 (stops), p. 1:76-1:77 (EC).
+- [x] Regarder dans le PDF : p. 3:323 / 3:296 / 3:329 (M1 ou M2), Table 3-10 (stops), p. 1:76-1:77 (EC) — fait le 29/10/2026.
 - [ ] Trouver un désassembleur ia64 pour tester l'encodage du bundle d'exemple.
