@@ -87,3 +87,14 @@ Chaque `AR` dépend d'un type d'unité d'exécution (**M-unit** ou **I-unit**) p
 - **Ordre des octets (Endianness, § 3.2.3, Figures 3-13 et 3-14, p. `1:36`–`1:37`) :**
   - Contrôlé par le bit `UM.be` (`0` = little-endian, `1` = big-endian) pour les chargements et écritures de données en mode Itanium.
   - **Exception importante :** la lecture des instructions (*instruction fetch*) est **toujours en little-endian** (le champ `template` est toujours dans l'octet 0 du bundle), quel que soit `UM.be` (§ 3.2.3, p. `1:37`). Le RSE a son propre bit `RSC.be` (Table 3-4, p. `1:29`).
+
+
+---
+
+## 6. Regard critique & limites architecturales (pour IA-86)
+
+| Élément | Verdict | Analyse critique |
+|---|---|---|
+| **65e bit `NaT` sur chaque `GR` et 82 bits sur chaque `FR`** | ❌ **Coût disproportionné** | Ces largeurs non puissances de 2 (65 et 82 bits) cassent la symétrie des bus internes, interdisent de stocker directement un registre sur sa taille naturelle en mémoire et obligent à inventer des mécanismes dédiés (`UNAT`, `RNAT` toutes les 63 sauvegardes, `stf.spill` sur 16 octets) uniquement pour ne pas perdre 1 bit d'état spéculatif lors d'un *spill*. |
+| **Comportement asymétrique à l'écriture (`r0` = faute vs `p0` = ignoré)** | ✅ **Bien pensé** | Ignorer l'écriture sur `p0` permet d'utiliser une seule instruction `cmp p1, p0 = ...` quand on n'a besoin que d'un seul prédicat, tandis que piéger l'écriture sur `r0` attrape les bogues de génération de code (puisqu'une instruction qui ne veut pas écrire de registre général n'a pas de raison d'exister, sauf `nop`). |
+| **Fragmentation des registres spéciaux (`BR`, `AR(I)` vs `AR(M)`, `CFM`)** | ⚠️ **À simplifier** | Séparer 8 registres de branchement `BR` des `GR` et diviser les `AR` entre unité `M` et unité `I` multiplie les transferts `mov` inter-banques (et les stops `;;` associés). Dans IA-86, pouvoir sauter directement sur un `GR` (comme RISC-V) éviterait cette latence de préparation de saut indirect. |

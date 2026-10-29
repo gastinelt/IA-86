@@ -81,3 +81,15 @@ Un `ld.a r32 = [r8]` placé dans une boucle pipelinée cible un **nouveau regist
 4. **Instructions `fmin`/`fmax` non commutatives et `ldfp` (§ 6.3.6.2 et § 6.3.7.1, p. `1:214`–`1:217`) :**
    - `fmin f1 = f2, f3` équivaut exactement à ` (f2 < f3) ? f2 : f3 ` : si `f2` ou `f3` est `NaN`, la comparaison `<` est fausse et l'instruction renvoie toujours le **second opérande `f3`**. Selon l'ordre des opérandes dans une boucle de recherche de minimum, on peut donc choisir d'ignorer les `NaN` ou de les propager (p. `1:215`).
    - **`ldfp8` / `ldfps` / `ldfpd` (*Load Pair*, p. `1:216`–`1:217`) :** charge deux flottants contigus en une seule instruction M, ce qui double la bande passante mémoire (ex. produit scalaire `DDOT` à 2 itérations par cycle). **Contrainte matérielle stricte :** les deux registres cibles doivent être une paire de registres **physiques** pair/impair (attention à la rotation !), sinon faute `Illegal Operation`.
+
+
+---
+
+## 4. Regard critique & limites architecturales (pour IA-86)
+
+| Observation tirée du Guide d'optimisation | Ce que cela révèle sur l'architecture IA-64 |
+|---|---|
+| **L'illusion du « zéro surcoût » sur les boucles pipelinées (§ 5.4.3.2, p. `1:188`)** | L'exemple phare de la p. `1:188` affiche 1 cycle par itération pour $N = 200$, mais omet le prologue de fonction qui doit sauvegarder `AR[LC]`, `AR[EC]` et les prédicats *callee-saved*, exécuter `clrrrb.pr`, initialiser `LC`, `EC`, `pr.rot` avec un stop obligatoire avant la boucle, puis tout restaurer après. Sur des boucles de taille modeste ($N \le 15$) ou contenant des appels de fonctions, ce surcoût fixe annule l'avantage de la rotation matérielle. |
+| **Couplage fragile avec la taille microarchitecturale de l'`ALAT` (§ 5.5.5, p. `1:196`)** | Le fait qu'une boucle pipelinée utilisant `ld.a` tombe à **0 % de réussite** dès que la distance entre `ld.a` et `ld.c` atteint la taille physique de l'`ALAT` (32 entrées dans l'exemple d'Intel) brise l'abstraction entre ISA et microarchitecture : un binaire compilé pour une `ALAT` de 64 entrées s'effondrera sur un cœur doté de 32 entrées. |
+| **La contrainte paire/impaire physique de `ldfp` face à la rotation (§ 6.3.7.1, p. `1:216`)** | Comme `ldfp` exige deux registres cibles qui soient pair/impair **après renommage physique par `rrb.fr`** (ou inverse son ordre pair/impair à chaque tour), on ne peut pas simplement utiliser `ldfp` dans une boucle pipelinée à `II = 1` sans dérouler la boucle un nombre pair de fois ! |
+| **Division et racine carrée en logiciel (`frcpa` + 10 à 17 `fma`, § 6.3.3, p. `1:211`)** | Excellente idée pour le débit de boucles vectorisables intensives (HPC), mais **catastrophique pour la densité de code** dans du code généraliste où chaque division solitaire injecte ~3 bundles (48 octets) et mobilise 4 à 6 registres flottants temporaires + `FPSR.sf1`. |

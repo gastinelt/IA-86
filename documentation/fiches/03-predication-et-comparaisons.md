@@ -95,3 +95,15 @@ Trois instructions (format `I23`, `I24`, `I25` sur l'unité **I**) transfèrent 
 
 > **Règle importante sur la rotation (§ 4.3.4, p. `1:57`) :**
 > Les trois instructions `mov pr` accèdent aux prédicats tournants (`PR16`–`PR63`) **comme si la base de renommage `CFM.rrb.pr` valait `0`** (elles ignorent le renommage de rotation). Il faut donc exécuter `clrrrb` ou `clrrrb.pr` avant d'initialiser les prédicats d'une boucle pipelinée si `rrb.pr` n'est pas déjà nul.
+
+
+---
+
+## 6. Regard critique & limites architecturales (pour IA-86)
+
+| Élément | Verdict | Analyse critique |
+|---|---|---|
+| **Coût de 6 bits (`qp`) sur 100 % des instructions** | ⚠️ **Taxe d'encodage lourde** | Réserver 6 bits (`qp`) dans **chaque** instruction de 41 bits consomme $14{,}6\,\%$ de tout le binaire, alors que la majorité des instructions d'un programme sont inconditionnelles (`qp = p0 = 0`). |
+| **Double cible `p1, p2` et type `.unc` sur les comparaisons** | ✅ **Très efficace** | Générer en un cycle une condition et sa négation (`p1, p2`) ou annuler automatiquement les deux si la branche parente est fausse (`.unc`) élimine proprement les arbres de sauts dans les petits blocs `if / else if / else`. |
+| **Restriction cachée des comparaisons parallèles (`.and`, `.or`, DeMorgan)** | ❌ **Goulot d'encodage** | À cause du manque de bits dans le format de 41 bits, `cmp.lt.and` ou `cmp.gt.or` **n'existent pas entre deux registres (`r2` et `r3`)** : ils ne sont encodables que pour `==`, `!=` ou une comparaison signée avec **`0`** (Table 4-11, p. `1:56`) ! Pour évaluer `(a < b && c < d)` en parallèle, le compilateur ne peut donc pas utiliser directement les comparaisons parallèles vantées par le manuel. |
+| **`mov pr` qui ignore `CFM.rrb.pr`** | ⚠️ **Piège matériel** | Le fait que `mov pr` accède aux prédicats physiques sans passer par le renommage `rrb.pr` oblige à exécuter `clrrrb.pr` avant d'initialiser une boucle pipelinée ou complique la sauvegarde de contexte au milieu d'une boucle. |

@@ -147,3 +147,15 @@ Chaque instruction traverse logiquement 4 phases : 1. *fetch* → 2. *read* → 
 ### 5.5 Sanction d'une violation de dépendance (§ 3.4.4 et § 3.5, p. `1:44`–`1:45`)
 - Le comportement du programme est **architecturalement indéfini** (*undefined behavior*).
 - Les processeurs qui implémentent une détection matérielle déclenchent une faute **`Illegal Dependency Fault`** sur la **seconde** instruction en cause (le lecteur pour un RAW, le second écrivain pour un WAW, l'écrivain de `PR63` pour le WAR).
+
+
+---
+
+## 6. Regard critique & limites architecturales (pour IA-86)
+
+| Élément | Verdict | Analyse critique |
+|---|---|---|
+| **Templates 5 bits combinant types d'unités ET position des stops** | ❌ **Rigidité excessive** | Sur 5 bits (24 templates valides), il est impossible de représenter toutes les combinaisons d'unités (`F`, `B`, `M`, `I`) et de stops internes (seuls `MI_I` et `M_MI` ont un stop au milieu !). Le compilateur est forcé d'insérer massivement des `nop.m`/`nop.i`/`nop.b` dès qu'un stop tombe après le slot 0 ou 1 d'un autre triplet, ce qui gonfle le binaire et gaspille le cache L1I. |
+| **Le paradoxe de la vérification des dépendances (§ 3.4.1–3.4.4)** | ❌ **Promesse EPIC non tenue** | EPIC promettait de supprimer la logique matérielle de détection des dépendances inter-instructions. En réalité, la spécification accumule tellement d'exceptions (`alloc`, `ld.c`, écriture `BR`/`PFS`/`PR` avant saut, `UNAT` au bit près, `PR63` en WAR) et demande au processeur de lever `Illegal Dependency Fault` que le matériel doit quand même embarquer un réseau complexe de comparateurs de registres. |
+| **Instruction 64 bits `movl` / `brl` limitée aux slots 1+2 du seul template `MLX`** | ⚠️ **Contrainte lourde** | Charger une constante 64 bits impose le template `MLX` (`0x04`/`0x05`), dont le slot 0 est obligatoirement `M`. Impossible de combiner `movl` avec un branchement ou un flottant dans le même bundle. |
+| **Séparation entre « groupement parallèle explicite (stops) » et « routage vers les unités »** | 💡 **Piste clé pour IA-86** | L'idée d'indiquer explicitement les frontières de dépendance (stops) est intéressante, mais **la coupler rigidement au routage d'unités (`M/I/F/B`) par paquets de 3 slots de 41 bits est l'erreur centrale d'encodage d'IA-64**. |

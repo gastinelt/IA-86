@@ -96,3 +96,14 @@ Si une étiquette `L` est fréquemment cible d'un saut (ex. tête de boucle) **e
 
 ### 4.5 Astuce matérielle pour les boucles d'attente (*Spinlocks* / *Multi-threading*, § 4.5.1, p. `1:177`–`1:178`)
 Sur un processeur Itanium multi-threadé (SMT), un thread qui attend qu'un verrou mémoire se libère peut exécuter un **chargement avancé `ld.a` sur l'adresse du verrou**, suivi de l'instruction **`hint @pause`** : le processeur cède alors ses ressources aux autres threads matériels et **réveille automatiquement la priorité du thread dès que l'entrée `ALAT` du verrou est invalidée par l'écriture d'un autre cœur** !
+
+
+---
+
+## 5. Regard critique & limites architecturales (pour IA-86)
+
+| Observation tirée du Guide d'optimisation | Ce que cela révèle sur l'architecture IA-64 |
+|---|---|
+| **L'aveu d'Intel sur l'`if-conversion` perdante (§ 4.2.4, p. `1:168`–`1:170`)** | Intel démontre lui-même qu'avec une pénalité de branchement de 10 cycles et seulement 10 % d'erreurs de prédiction, **prédiquer les deux branches d'un `if/else` est souvent plus lent qu'un branchement conditionnel classique**, parce que les instructions à prédicat faux (`qp = 0`) consomment quand même la bande passante d'émission, les unités d'exécution (`M`/`I`/`F`) et imposent les stops du chemin le plus long ! |
+| **Dépendance extrême au profilage d'exécution (*Profile-Guided Optimization*)** | Pour décider s'il faut utiliser `ld.a` (selon la probabilité d'aliasing $p_1, p_2$) ou s'il faut prédiquer un `if/else` (selon le taux exact de prise du saut et le taux d'erreur du prédicteur), le compilateur a besoin de statistiques qui **n'existent qu'au moment de l'exécution**. Sans profil représentatif, le compilateur statique fait fréquemment le mauvais choix. |
+| **Usage détourné de l'`ALAT` pour `hint @pause` (§ 4.5.1, p. `1:177`)** | Détourner une entrée `ALAT` pour surveiller une adresse de verrou en SMT est ingénieux (équivalent à `MONITOR`/`MWAIT` sur x86 ou `WFE` sur ARM), mais confirme qu'une simple primitive dédiée de surveillance d'adresse suffit sans avoir besoin de toute la machinerie de spéculation de données `ld.a`/`chk.a`. |

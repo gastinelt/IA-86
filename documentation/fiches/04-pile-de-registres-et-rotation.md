@@ -99,3 +99,14 @@ Le corps de la boucle est découpé en $S$ étages de pipeline logiciel, contrô
 - N'utilisent **pas** `LC` : la condition de poursuite est donnée par le **prédicat qualificatif `PR[qp]`** (`1` pendant le noyau, `0` pendant l'épilogue).
 - Tant que `PR[qp] == 1` : la boucle continue, `EC` n'est pas modifié, les registres tournent et **`PR16` est mis à `0` après rotation** (dans une boucle `while`, c'est le calcul de condition dans le corps de boucle qui allume le prédicat du premier étage utile).
 - Quand `PR[qp] == 0` : même comportement d'épilogue avec `EC` (`EC > 1` continue et décrémente `EC` ; `EC == 1` sort, décrémente `EC` et tourne ; `EC == 0` sort sans tourner et met `PR63 = 0`).
+
+
+---
+
+## 4. Regard critique & limites architecturales (pour IA-86)
+
+| Élément | Verdict | Analyse critique |
+|---|---|---|
+| **Asymétrie majeure entre RSE (`GR` seuls) et Rotation (`GR`, `FR`, `PR`)** | ❌ **Défaut de conception** | `GR32–127`, `FR32–127` et `PR16–63` tournent tous les trois, et `br.call` remet les trois bases `rrb.gr`, `rrb.fr`, `rrb.pr` à `0`. **Mais seul `GR32–127` est empilé par le RSE !** Les 96 registres flottants `FR32–127` et les 48 prédicats `PR16–63` ne sont **pas** empilés lors d'un appel de fonction : toute fonction appelée depuis une boucle pipelinée (ou utilisant `FR32+` / `PR16+`) oblige le compilateur à sauvegarder/restaurer ces registres manuellement en mémoire. |
+| **Complexité système du RSE (2 piles : mémoire classique + *Backing Store*)** | ❌ **À rejeter** | Le RSE introduit une seconde pile en mémoire (*Backing Store*), asynchrone par rapport au flux d'instructions, entrelacée tous les 63 mots avec un mot `RNAT`, et qui bloque le processeur lors des changements de contexte/threads (`flushrs` / `loadrs`). Les fenêtres de registres (SPARC) et le RSE (Itanium) ont prouvé qu'un renommage matériel transparent de pile (ou de simples instructions `ldp`/`stp` rapides) est bien supérieur. |
+| **Coût caché d'initialisation des boucles pipelinées (`LC`, `EC`, `mov pr.rot`)** | ⚠️ **Seulement rentable sur boucles longues** | `AR[LC]` et `AR[EC]` sont *callee-saved* et exigent un stop `;;` entre leur écriture et `br.ctop` ([Fiche 2 § 5.2](file:///C:/Users/theog/Documents/_CODE/10-ia64/IA86/documentation/fiches/02-bundles-templates-et-groupes.md#L133)). Pour une boucle courte ($N < 10$ itérations), sauvegarder `LC`/`EC`/`PR`, initialiser `LC`/`EC`/`pr.rot` et les restaurer à la sortie coûte plus cher que la boucle elle-même. |

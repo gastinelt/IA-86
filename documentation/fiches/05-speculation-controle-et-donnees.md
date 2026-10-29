@@ -90,3 +90,15 @@ Un chargement peut être **à la fois** spéculatif en contrôle et en données 
   2. **N'alloue aucune nouvelle entrée** dans l'`ALAT`.
   3. Met le bit **`NaT = 1`** (ou écrit `NaTVal`) dans le registre cible.
 - **Conséquence :** comme aucune entrée n'est présente dans l'`ALAT` lorsqu'une exception a été différée, **un seul `ld.c` ou `chk.a` suffit pour détecter à la fois une collision mémoire et une exception différée !**
+
+
+---
+
+## 4. Regard critique & limites architecturales (pour IA-86)
+
+| Élément | Verdict | Analyse critique |
+|---|---|---|
+| **Le code de récupération (*recovery code*) et le gonflement binaire** | ❌ **Point faible majeur** | Contrairement à un processeur *out-of-order* qui annule une spéculation en matériel sans une seule instruction supplémentaire, `chk.s` et `chk.a` exigent que le compilateur génère en fin de binaire ("*cold code*") une copie complète de la chaîne d'instructions spéculées avec un saut aller-retour, tout en maintenant vivants tous les registres sources jusqu'au `chk`. |
+| **Fragilité de l'`ALAT` face à la capacité, au multi-threading et à la rotation** | ❌ **Mécanisme trop fragile** | Comme la taille de l'`ALAT` (ex. 32 entrées) n'est pas architecturale, un programme optimisé pour une `ALAT` de 32 entrées peut s'effondrer si un autre thread SMT, un appel de fonction ou une boucle pipelinée (> 32 rotations, voir [Fiche 7 § 2.4](file:///C:/Users/theog/Documents/_CODE/10-ia64/IA86/documentation/fiches/07-optimisation-boucles-et-flottants.md#L58)) évince des entrées valides, déclenchant des *false misses* et des sauts répétés vers le code de récupération. |
+| **Absence de vérification automatique des *spills* du RSE contre l'`ALAT` (§ 4.4.5.3.2, p. `1:67`)** | ⚠️ **Verrou de sécurité délicat** | Les écritures du RSE dans le *Backing Store* n'invalident pas l'`ALAT`, ce qui interdit d'utiliser `ld.a` sur la mémoire du *Backing Store* sans synchronisation explicite. |
+| **L'idée du chargement sans faute (`ld.s` / *non-faulting load*)** | ✅ **Idée à retenir sous forme allégée** | Pouvoir émettre un chargement spéculatif qui ne plante pas sur une adresse invalide est utile (vectorisation de boucles à sortie anticipée), mais peut être réalisé sans bit `NaT` sur 65 bits ni code de récupération (par ex. en retournant zéro ou en n'activant la trappe que si le chemin est pris, façon *First-Faulting Loads* d'ARM SVE). |
